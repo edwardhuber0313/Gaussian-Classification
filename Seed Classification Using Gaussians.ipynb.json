@@ -1,0 +1,600 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "%matplotlib inline\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "from scipy.stats import norm, multivariate_normal\n",
+    "import ipywidgets as widgets\n",
+    "from IPython.display import display\n",
+    "import warnings\n",
+    "warnings.filterwarnings('ignore')\n",
+    "from ipywidgets import interact, interactive, fixed, interact_manual, IntSlider"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Data used is from UCI's Machine Learning Repository. The specific set can be found at https://archive.ics.uci.edu/ml/datasets/seeds.\n",
+    "This dataset, per the UCI website, contains \"measurements of geometrical properties of kernels to belonging to three different varieties of wheat.\" My goal in this project is to test classification techniques using Guassian distributions to see if the algorithm can accurately predict class 1 - Kama, class 2 - Rosa, or class 3 - Canadian. There are 70 examples of each class in the given data set. "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "(210, 8)\n",
+      "[14.88   14.57    0.8811  5.554   3.333   1.018   4.956   1.    ]\n"
+     ]
+    }
+   ],
+   "source": [
+    "#loading text file and examining the shape to be sure that the website description \n",
+    "#of 210 instances with 7 attributes each, and see at which index the class feature is found.\n",
+    "data = np.loadtxt('seeds_dataset.txt')\n",
+    "print(data.shape)\n",
+    "print(data[1])"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "According to the aforementioned website the indices are labelled as follows:\n",
+    "0 - area A of the kernel\n",
+    "1 - perimiter P\n",
+    "2 - compactness where C = 4(pi)A/P^2\n",
+    "3 - length of the kernel\n",
+    "4 - width of the kernel\n",
+    "5 - asymmetry coefficient\n",
+    "6 - length of kernel groove\n",
+    "7 - Class (1, 2, 3)\n",
+    "\n",
+    "FOR PURPOSES OF THE MACHINE LEARNING STUDY, I WILL NOT FOCUS ON THE SPECIFICATIONS OF WHAT EACH OF THESE FEATURES MEAN, RATHER I WILL TAKE THEM AS GIVEN AND USE THEM TO TEST CLASSIFICATION ALGORITHMS."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#Let's put the feature names into a variable for future use\n",
+    "featureNames = ['area', 'perimiter', 'compactness', 'lengthKernel', 'widthKernel',\n",
+    "               'asymmetryCoefficient', 'lengthGroove']"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#Next let's split the data into training and test sets using random permutations\n",
+    "#in case the dataset is in a strict order (which it is in this particular case)\n",
+    "np.random.seed(0)\n",
+    "perm = np.random.permutation(len(data)) #because there are 210 seeds tested\n",
+    "trainx = data[perm[0:150], 0:7] #will use 5/7 of the data as training\n",
+    "trainy = data[perm[0:150], 7]\n",
+    "testx = data[perm[150:210], 0:7] #2/7 for testing\n",
+    "testy = data[perm[150:210], 7]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(53, 51, 46)"
+      ]
+     },
+     "execution_count": 5,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "#Let's make sure the data is appropriate by counting the number of training points from each class\n",
+    "sum(trainy == 1), sum(trainy ==  2), sum(trainy == 3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Good! it looks like the data was split nicely.\n",
+    "I will start by looking at the distribution of each single feature with it's Gaussian fit.\n",
+    "I am using a slider so that inside the code we can easily look at the distributions of each of the three classes over their 7 features. "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "4f77def133504ce69e850754107fe03e",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "interactive(children=(IntSlider(value=1, description='feature', max=6, min=1), IntSlider(value=1, description=…"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "@interact_manual(feature = IntSlider(0,1,6), label = IntSlider(1,1,3)) \n",
+    "def density_plot(feature, label):\n",
+    "        plt.hist(trainx[trainy == label, feature], normed = True)\n",
+    "        mu = np.mean(trainx[trainy == label, feature])\n",
+    "        var = np.var(trainx[trainy == label, feature])\n",
+    "        std = np.sqrt(var)\n",
+    "        x_axis = np.linspace(mu-3*std, mu+3*std, 500)\n",
+    "        plt.plot(x_axis, norm.pdf(x_axis, mu, std), 'r', lw = 2)\n",
+    "        plt.title(\"Seed\" + str(label))\n",
+    "        plt.xlabel(featureNames[feature], fontsize = 10, color = 'red')\n",
+    "        plt.ylabel('Density', fontsize = 10, color = 'red')\n",
+    "        plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Now let's compare the Gaussian of each class in each specific feature. First, we need to define some function that will fit the model to each class using a single (yet adjustable) feature. "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def fit_model(x,y,feature):\n",
+    "    k = 3 #we have 3 classes\n",
+    "    mu = np.zeros(k+1)\n",
+    "    var = np.zeros(k+1)\n",
+    "    pi = np.zeros(k+1) #class weights\n",
+    "    for label in range(1,k+1):\n",
+    "        indices = (y == label)\n",
+    "        mu[label] = np.mean(x[indices, feature])\n",
+    "        var[label] = np.var(x[indices, feature])\n",
+    "        pi[label] = float(sum(indices))/float(len(y))\n",
+    "    return mu, var, pi"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Let's print 2 examples of class weights just to make sure the function appears to work appropriately."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[0.         0.87995849 0.88411569 0.84566087]\n",
+      "[0.         0.00028262 0.00027282 0.00044643]\n",
+      "[0.         0.35333333 0.34       0.30666667]\n"
+     ]
+    }
+   ],
+   "source": [
+    "mu,var,pi = fit_model(trainx, trainy, 2)\n",
+    "print(mu)\n",
+    "print(var)\n",
+    "print(pi)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Good! we have a function to calculate the weights for each class using a given feature, and it can be used in side the function to create a comparative graph of each class over each feature."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "f389af4bb8554bc7a3aa652777674540",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "interactive(children=(IntSlider(value=0, description='feature', max=6), Button(description='Run Interact', sty…"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "@interact_manual(feature = IntSlider(0,0,6))\n",
+    "def show_densities(feature):\n",
+    "    mu, var, pi = fit_model(trainx, trainy, feature)\n",
+    "    colors = ['g', 'r', 'b']\n",
+    "    for label in range(1,4):\n",
+    "        m = mu[label]\n",
+    "        s = np.sqrt(var[label])\n",
+    "        x_axis = np.linspace(m-3*s, m+3*s, 1000)\n",
+    "        plt.plot(x_axis, norm.pdf(x_axis, m, s), colors[label-1],\n",
+    "                label = 'Seed' + str(label))\n",
+    "        plt.xlabel(featureNames[feature], fontsize = 10, color = 'green')\n",
+    "        plt.ylabel('Density', fontsize = 10, color = 'green')\n",
+    "        plt.legend()\n",
+    "    plt.show()\n",
+    "    print(mu)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "By running through each of the feature density comparisons above, one cane see that there will more than likely be a high amount of test error, so let's write a function to calculate that error."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "bec6116e609b4795a58d6d03c7281daf",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "interactive(children=(IntSlider(value=0, description='feature', max=6), Output()), _dom_classes=('widget-inter…"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "@interact(feature = IntSlider(0,0,6))\n",
+    "def test_model(feature):\n",
+    "    mu, var, pi = fit_model(trainx, trainy, feature)\n",
+    "    k = 3\n",
+    "    n_test = len(testy)\n",
+    "    score = np.zeros((n_test, k+1))\n",
+    "    for i in range(0, n_test):\n",
+    "        for label in range(1, k+1):\n",
+    "            score[i, label] = np.log(pi[label]) + \\\n",
+    "            norm.logpdf(testx[i, feature], mu[label], \n",
+    "            np.sqrt(var[label]))\n",
+    "    pred = np.argmax(score[:,1:4], axis = 1) + 1\n",
+    "    errors = np.sum(pred != testy)\n",
+    "    print(\"Errors made using\" + ' ' + featureNames[feature] + \": \" + str(errors) + '/' + str(n_test))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "The first feature was our only reasonably successful predictor feature, returning an error of 3/20 on the test set. All other features returned an error of over 50%. Perhaps for this dataset using a univariate model is not the way to go. Let's try it with a bivariate Guassian and see what happens..."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#Creating a helper function to fit the Gaussian for more than one feature\n",
+    "def fit_model(x, features):\n",
+    "    mu = np.mean (x[:,features], axis = 0)\n",
+    "    covariance = np.cov(x[:, features], rowvar = 0, bias = 1)\n",
+    "    return mu, covariance"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[14.18188679 14.21773585]\n",
+      "[[1.53834738 0.70984389]\n",
+      " [0.70984389 0.34376846]]\n"
+     ]
+    }
+   ],
+   "source": [
+    "#this will give us the mean of the two features and a covariance matrix\n",
+    "label = 1 \n",
+    "mu, covariance = fit_model(trainx[trainy == label, :], [0,1])\n",
+    "print(mu)\n",
+    "print(covariance)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#creating a helper function to find the range for which the values of selected features lie\n",
+    "def findRange(x):\n",
+    "    lower = min(x)\n",
+    "    upper = max(x)\n",
+    "    width = upper - lower\n",
+    "    lower = lower - 0.2*width\n",
+    "    upper = upper + 0.2*width\n",
+    "    return lower, upper"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "(12.064, 16.026)\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(findRange(trainx[trainy == 1, 1])) #test example to make sure it works"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Now that that's finished, a function to plot contour lines on a grid for the two-dimensional Gaussian is necessary. Let's establish a function for that as well as a function to actually plot it all together. "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def contours(mu, cov, x1grid, x2grid, col):\n",
+    "    rv = multivariate_normal(mean = mu, cov = cov)\n",
+    "    z = np.zeros((len(x1grid), len(x2grid)))\n",
+    "    for i in range(0, len(x1grid)):\n",
+    "        for j in range(0, len(x2grid)):\n",
+    "            z[j,i] = rv.logpdf([x1grid[i], x2grid[j]])\n",
+    "    sign, logdet = np.linalg.slogdet(cov)\n",
+    "    normalizer = -0.5 * (2*np.log(6.28) + sign * logdet)\n",
+    "    for offset in range(1,4):\n",
+    "        plt.contour(x1grid, x2grid, z, \n",
+    "                   levels = [normalizer - offset], colors = col,\n",
+    "                   linewidths = 2.0, linestyles = 'solid')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "a3b7570193794e65bbf38dcc36bf3b53",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "interactive(children=(IntSlider(value=0, description='f1', max=6), IntSlider(value=0, description='f2', max=6)…"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "@interact_manual(f1 = IntSlider(0,0,6, 1), f2 = IntSlider(0,0,6,1),\n",
+    "                 label = IntSlider(1,1,3,1))\n",
+    "def bivariatePlot(f1, f2, label):\n",
+    "    if f1 == f2:\n",
+    "        print(\"Please choose two features that are different.\")\n",
+    "        return \n",
+    "    x1_lower, x1_upper = findRange(trainx[trainy == label, f1])\n",
+    "    x2_lower, x2_upper = findRange(trainx[trainy == label, f2])\n",
+    "    plt.xlim(x1_lower, x1_upper)\n",
+    "    plt.ylim(x2_lower, x2_upper)\n",
+    "    plt.plot(trainx[trainy == label, f1], trainx[trainy == label, f2], 'ro')\n",
+    "    res = 300\n",
+    "    x1grid = np.linspace(x1_lower, x1_upper, res)\n",
+    "    x2grid = np.linspace(x2_lower, x2_upper, res)\n",
+    "    mu, cov = fit_model(trainx[trainy == label, :], [f1,f2])\n",
+    "    contours(mu, cov, x1grid, x2grid, 'k')\n",
+    "    plt.xlabel(featureNames[f1], fontsize = 10, color = 'g')\n",
+    "    plt.ylabel(featureNames[f2], fontsize = 10, color = 'g')\n",
+    "    plt.title('Seed' + str(label), fontsize = 10, color = 'g')\n",
+    "    plt.show()\n",
+    "    "
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "This is great, the plots above show us some strong correlations between features. As before, let's now plot the three Gaussians on the same graph, this time in relation to two features each."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def fit_model_bivariate(x, y, features):\n",
+    "    k = 3\n",
+    "    d = len(features)\n",
+    "    mu = np.zeros((k+1, d))\n",
+    "    covar = np.zeros((k+1, d, d))\n",
+    "    pi = np.zeros(k+1)\n",
+    "    for label in range(1, k+1):\n",
+    "        indices = (y == label)\n",
+    "        mu[label,:], covar[label,:,:] = fit_model(x[indices,:], features)\n",
+    "        pi[label] = float(sum(indices))/float(len(y))\n",
+    "    return mu, covar, pi"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "7368244509394f2aa56cacfc790be1d1",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "interactive(children=(IntSlider(value=0, description='f1', max=6), IntSlider(value=0, description='f2', max=6)…"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "@interact_manual(f1 = IntSlider(0, 0, 6, 1), f2 = IntSlider(0,0,6,1))\n",
+    "def threePlot(f1,f2):\n",
+    "    if f1 == f2:\n",
+    "        print(\"Please choose features that are different from each other\")\n",
+    "        return\n",
+    "    x1_lower, x1_upper = findRange(trainx[:, f1])\n",
+    "    x2_lower, x2_upper = findRange(trainx[:, f2])\n",
+    "    plt.xlim(x1_lower, x1_upper)\n",
+    "    plt.ylim(x2_lower, x2_upper)\n",
+    "    colors = ['g', 'b', 'r']\n",
+    "    for label in range(1,4):\n",
+    "        plt.plot(trainx[trainy == label, f1], trainx[trainy == label, f2], marker = 'o', ls = 'None', c = colors[label-1])\n",
+    "    res = 400\n",
+    "    x1grid = np.linspace(x1_lower, x1_upper, res)\n",
+    "    x2grid = np.linspace(x2_lower, x2_upper, res)\n",
+    "    mu, covar, pi = fit_model_bivariate(trainx, trainy, [f1,f2])\n",
+    "    for label in range(1, 4):\n",
+    "        gmean = mu[label,:]\n",
+    "        gcov = covar[label,:,:]\n",
+    "        contours(gmean, gcov, x1grid, x2grid, colors[label-1])\n",
+    "    plt.xlabel(featureNames[f1], fontsize = 10, color = 'black')\n",
+    "    plt.ylabel(featureNames[f2], fontsize = 10, color = 'black')\n",
+    "    plt.title(\"Wheat Seeds Comparison\", fontsize = 10, color = 'black')\n",
+    "    plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "608fabeefa454dd091ff6f4a8b65e25e",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "interactive(children=(IntSlider(value=0, description='f1', max=6), IntSlider(value=0, description='f2', max=6)…"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "@interact(f1 = IntSlider(0,0,6,1), f2 = IntSlider(0,0,6,1))\n",
+    "def test(f1,f2):\n",
+    "    if f1 == f2:\n",
+    "        print(\"Please choose features that are different from each other\")\n",
+    "        return\n",
+    "    features = [f1,f2]\n",
+    "    mu, covar, pi = fit_model_bivariate(trainx, trainy, features)\n",
+    "    k = 3\n",
+    "    nt = len(testy)\n",
+    "    score = np.zeros((nt, k+1))\n",
+    "    for i in range(0,nt):\n",
+    "        for label in range(1, k+1):\n",
+    "            score[i, label] = np.log(pi[label]) +\\\n",
+    "            multivariate_normal.logpdf(testx[i,features], mean = \n",
+    "            mu[label,:], cov = covar[label,:,:])\n",
+    "    preds = np.argmax(score[:,1:4], axis = 1) + 1\n",
+    "    errors = np.sum(preds != testy)\n",
+    "    print(\"Errors using features\" + \" \" + str(f1) + \" and \" + str(f2) + \": \" + str(errors) + '/' + str(nt))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Scrolling through the errors made on the test set using the bivariate Gaussian shows a great improvement over the univariate test. The lowest amount of errors made was 0, a perfect score (using features 3 and 6), and the highest was 19 (using features 2 and 5). "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
